@@ -10,7 +10,7 @@ from glob import glob
 
 import torch
 
-GroundingDINO_dir = "/is/cluster/fast/sbian/github/PuzzleAvatar/thirdparties/GroundingDINO"
+GroundingDINO_dir = "/home/sss/project/pose_3d/PuzzleAvatar/thirdparties/GroundingDINO"
 sys.path.insert(0, GroundingDINO_dir)
 
 import base64

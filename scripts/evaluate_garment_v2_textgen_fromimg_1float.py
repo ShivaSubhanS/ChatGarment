@@ -19,7 +19,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from torch.utils.data import Dataset
 
-import deepspeed
 from functools import partial
 from easydict import EasyDict as edict
 from typing import Dict, Optional, Sequence, List
@@ -36,7 +35,7 @@ from llava.model import *
 from llava.mm_utils import tokenizer_image_token
 from llava.json_fixer import repair_json
 from llava.prompts_utils import get_text_labels
-from llava.train.train_garmentcode_outfit import ModelArguments, DataArguments, TrainingArguments, rank0_print
+from llava.inference_args import ModelArguments, DataArguments, TrainingArguments, rank0_print, get_checkpoint_path
 from llava.garment_utils_v2 import run_garmentcode_parser_float50
 
 from openai import OpenAI
@@ -350,7 +349,7 @@ def main(args):
     )
 
     ########################################################################################
-    resume_path = 'checkpoints/try_7b_lr1e_4_v3_garmentcontrol_4h100_v4_final/pytorch_model.bin'
+    resume_path = get_checkpoint_path()
     state_dict = torch.load(resume_path, map_location="cpu")
     model.load_state_dict(state_dict, strict=True)
     model = model.bfloat16().cuda()

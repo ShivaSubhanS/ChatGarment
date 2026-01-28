@@ -34,7 +34,7 @@ import shutil
 from llava.json_fixer import repair_json
 
 from transformers import AutoTokenizer, BitsAndBytesConfig, CLIPImageProcessor
-from llava.train.train_garmentcode_outfit import ModelArguments, DataArguments, TrainingArguments, rank0_print
+from llava.inference_args import ModelArguments, DataArguments, TrainingArguments, rank0_print, get_checkpoint_path
 from llava.garment_utils_v2 import try_generate_garments, all_float_paths
 
 import json
@@ -309,7 +309,7 @@ def main(args):
     )
 
     ########################################################################################
-    resume_path = 'checkpoints/try_7b_lr1e_4_v3_garmentcontrol_4h100_v4_final/pytorch_model.bin'
+    resume_path = get_checkpoint_path()
     state_dict = torch.load(resume_path, map_location="cpu")
     model.load_state_dict(state_dict, strict=True)
     model = model.bfloat16().cuda()

@@ -21,7 +21,6 @@ from torch.utils.data import Dataset
 from llava import conversation as conversation_lib
 from llava.model import *
 from llava.mm_utils import tokenizer_image_token
-import deepspeed
 from functools import partial
 from easydict import EasyDict as edict
 from typing import Dict, Optional, Sequence, List
@@ -32,7 +31,7 @@ import tqdm
 import shutil
 from llava.json_fixer import repair_json
 
-from llava.train.train_garmentcode_outfit import ModelArguments, DataArguments, TrainingArguments, rank0_print
+from llava.inference_args import ModelArguments, DataArguments, TrainingArguments, rank0_print, get_checkpoint_path
 from llava.garment_utils_v2 import run_garmentcode_parser_float50
 
 import json
@@ -157,7 +156,7 @@ def translate_args(model_args, data_args, training_args):
 
     
 def main(args):
-    attn_implementation = 'flash_attention_2'
+    attn_implementation = 'eager'  # Changed from 'flash_attention_2' to 'eager'
     global local_rank
 
     parser = transformers.HfArgumentParser(
@@ -289,7 +288,7 @@ def main(args):
     )
 
     ########################################################################################
-    resume_path = 'checkpoints/try_7b_lr1e_4_v3_garmentcontrol_4h100_v4_final/pytorch_model.bin'
+    resume_path = get_checkpoint_path()
     state_dict = torch.load(resume_path, map_location="cpu")
     model.load_state_dict(state_dict, strict=True)
     model = model.bfloat16().cuda()

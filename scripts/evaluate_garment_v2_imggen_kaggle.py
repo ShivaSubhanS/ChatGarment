@@ -1,3 +1,7 @@
+"""
+Kaggle-specific inference script for ChatGarment
+Optimized for GPU execution on Kaggle with dataset paths
+"""
 import argparse
 import copy
 import os
@@ -13,6 +17,7 @@ import pickle as pkl
 import transformers
 import tokenizers
 
+# Add paths for Kaggle environment
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from llava.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
@@ -31,7 +36,8 @@ import tqdm
 import shutil
 from llava.json_fixer import repair_json
 
-from llava.inference_args import ModelArguments, DataArguments, TrainingArguments, rank0_print, get_checkpoint_path
+# Use Kaggle-specific inference args
+from llava.inference_args_kaggle import ModelArguments, DataArguments, TrainingArguments, rank0_print, get_checkpoint_path
 from llava.garment_utils_v2 import run_garmentcode_parser_float50
 
 import json
@@ -157,13 +163,20 @@ def translate_args(model_args, data_args, training_args):
     
 def main(args):
     print("\n" + "="*80)
-    print("Starting ChatGarment Inference")
+    print("Starting ChatGarment Inference on Kaggle GPU")
     print("="*80 + "\n")
+    
+    # Check GPU availability
+    if torch.cuda.is_available():
+        print(f"✓ GPU Available: {torch.cuda.get_device_name(0)}")
+        print(f"✓ GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+    else:
+        print("⚠ WARNING: No GPU detected! Using CPU (will be slow)")
     
     attn_implementation = 'eager'  # Changed from 'flash_attention_2' to 'eager'
     global local_rank
 
-    print("Step 1: Parsing command line arguments...")
+    print("\nStep 1: Parsing command line arguments...")
     parser = transformers.HfArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
@@ -172,6 +185,7 @@ def main(args):
     print(f"   - Local rank: {local_rank}")
     print(f"   - Compute dtype: {compute_dtype}")
     print(f"   - LoRA r: {training_args.lora_r}, alpha: {training_args.lora_alpha}")
+    print(f"   - Device: {training_args.device}")
 
     print("\nStep 2: Translating arguments...")
     args = translate_args(model_args, data_args, training_args)
@@ -231,7 +245,7 @@ def main(args):
     print("   - Enabling gradient checkpointing...")
     if hasattr(model, "enable_input_require_grads"):
         model.enable_input_require_grads()
-        model.gradient_checkpointing_enable() ###################### ？
+        model.gradient_checkpointing_enable()
     else:
         def make_inputs_require_grad(module, input, output):
             output.requires_grad_(True)
@@ -251,12 +265,12 @@ def main(args):
     )
     
     vision_tower = model.get_vision_tower()
-    # Keep vision tower on GPU for faster image processing
+    # Move vision tower to GPU
     print("   - Moving vision tower to GPU...")
     vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device="cuda")
     print("   ✓ Vision tower ready on GPU")
     
-    # Also move mm_projector to GPU to avoid device mismatch
+    # Move mm_projector to GPU
     print("   - Moving mm_projector to GPU...")
     model.get_model().mm_projector.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device="cuda")
     print("   ✓ mm_projector ready on GPU")
@@ -308,11 +322,12 @@ def main(args):
     model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
     model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
     
-    # Keep model on CPU to save GPU memory
-    print("\nStep 9: Keeping model on CPU to conserve GPU memory...")
+    # Move model to GPU for Kaggle
+    print("\nStep 9: Moving model to GPU...")
     assert args.precision == "bf16"
-    model = model.bfloat16()  # Keep on CPU, no .cuda()
-    print("   ✓ Model configured for CPU inference")
+    model = model.bfloat16().cuda()  # Move to GPU for Kaggle
+    device = torch.device("cuda")
+    print(f"   ✓ Model configured for GPU inference on {device}")
     
     print("\nStep 10: Preparing dataset...")
     print(f"   - Data path: {data_args.data_path_eval}")
@@ -327,11 +342,10 @@ def main(args):
     print("\nStep 11: Loading fine-tuned checkpoint...")
     resume_path = get_checkpoint_path()
     print(f"   - Checkpoint path: {resume_path}")
-    state_dict = torch.load(resume_path, map_location="cpu")
+    state_dict = torch.load(resume_path, map_location="cuda")  # Load to GPU
     print("   - Loading state dict...")
     model.load_state_dict(state_dict, strict=True)
-    model = model.bfloat16()  # Keep on CPU
-    device = torch.device("cpu")  # Set device to CPU
+    model = model.bfloat16().cuda()  # Ensure on GPU
     print("   ✓ Checkpoint loaded successfully")
 
     if data_args.data_path_eval[-1] == '/':
@@ -354,6 +368,11 @@ def main(args):
     random.seed(0)
     all_output_dir = []
     all_json_spec_files = []
+    
+    print("\n" + "="*80)
+    print("Starting inference on images...")
+    print("="*80 + "\n")
+    
     for i in range(len_val_dataset):    
         print(f"\n{'='*60}")
         print(f"DEBUG: Processing image {i+1}/{len_val_dataset}")
@@ -391,7 +410,7 @@ def main(args):
             image_clip = data_item['image']
             print(f"DEBUG: Image tensor shape: {image_clip.shape}, dtype: {image_clip.dtype}")
             
-            # Keep image on GPU for vision tower processing
+            # Move image to GPU
             image_clip = image_clip.unsqueeze(0).to("cuda")
             assert args.precision == "bf16"
             image_clip = image_clip.bfloat16()
@@ -402,13 +421,13 @@ def main(args):
             input_ids = tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
             print(f"DEBUG: Input IDs shape: {input_ids.shape}")
             
-            # Keep input_ids on CPU since model is on CPU
-            input_ids = input_ids.unsqueeze(0).to("cpu")
-            print(f"DEBUG: Input IDs moved to CPU, shape: {input_ids.shape}, device: {input_ids.device}")
+            # Move input_ids to GPU
+            input_ids = input_ids.unsqueeze(0).to("cuda")
+            print(f"DEBUG: Input IDs moved to GPU, shape: {input_ids.shape}, device: {input_ids.device}")
 
             print("DEBUG: Starting model.evaluate()...")
             output_ids, float_preds, seg_token_mask = model.evaluate(
-                image_clip,  # This will be moved to GPU inside the model for vision tower
+                image_clip,
                 image,
                 input_ids,
                 max_new_tokens=2048,
@@ -470,8 +489,12 @@ def main(args):
     saved_json_Path = os.path.join(parent_folder, 'vis_new', 'all_json_spec_files.json')
     with open(saved_json_Path, 'w') as f:
         json.dump(all_json_spec_files, f)
+    
+    print("\n" + "="*80)
+    print("✓ Inference completed successfully!")
+    print(f"✓ Results saved to: {parent_folder}")
+    print("="*80 + "\n")
 
         
 if __name__ == "__main__":
-    main(sys.argv[1:])         
-
+    main(sys.argv[1:])

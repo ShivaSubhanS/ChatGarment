@@ -109,12 +109,21 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         image_sizes: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> Union[GenerateOutput, torch.LongTensor]:
+        print("      DEBUG [generate]: Starting generate method...")
+        print(f"      DEBUG [generate]: inputs shape: {inputs.shape if inputs is not None else 'None'}")
+        print(f"      DEBUG [generate]: images shape: {images.shape if images is not None else 'None'}")
+        print(f"      DEBUG [generate]: kwargs keys: {list(kwargs.keys())}")
+        
         position_ids = kwargs.pop("position_ids", None)
         attention_mask = kwargs.pop("attention_mask", None)
+        print(f"      DEBUG [generate]: position_ids: {position_ids.shape if position_ids is not None else 'None'}")
+        print(f"      DEBUG [generate]: attention_mask: {attention_mask.shape if attention_mask is not None else 'None'}")
+        
         if "inputs_embeds" in kwargs:
             raise NotImplementedError("`inputs_embeds` is not supported")
 
         if images is not None:
+            print("      DEBUG [generate]: Processing multimodal inputs...")
             (
                 inputs,
                 position_ids,
@@ -131,15 +140,26 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
                 images,
                 image_sizes=image_sizes
             )
+            print(f"      DEBUG [generate]: After multimodal prep - inputs_embeds shape: {inputs_embeds.shape}")
+            print(f"      DEBUG [generate]: After multimodal prep - inputs_embeds device: {inputs_embeds.device}")
         else:
+            print("      DEBUG [generate]: No images, embedding tokens...")
             inputs_embeds = self.get_model().embed_tokens(inputs)
+            print(f"      DEBUG [generate]: Embedded tokens shape: {inputs_embeds.shape}")
 
-        return super().generate(
+        print("      DEBUG [generate]: Calling super().generate()...")
+        result = super().generate(
             position_ids=position_ids,
             attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
             **kwargs
         )
+        print("      DEBUG [generate]: super().generate() completed")
+        print(f"      DEBUG [generate]: Result type: {type(result)}")
+        if hasattr(result, 'sequences'):
+            print(f"      DEBUG [generate]: Result sequences shape: {result.sequences.shape}")
+        
+        return result
 
     def prepare_inputs_for_generation(self, input_ids, past_key_values=None,
                                       inputs_embeds=None, **kwargs):

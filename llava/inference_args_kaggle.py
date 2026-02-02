@@ -33,7 +33,7 @@ class DataArguments:
 
 @dataclass
 class TrainingArguments:
-    """Minimal version for inference only"""
+    """Kaggle-specific configuration for GPU inference"""
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
     remove_unused_columns: bool = field(default=False)
@@ -59,54 +59,51 @@ class TrainingArguments:
         metadata={"help": "How many bits to use."}
     )
     lora_enable: bool = False
-    lora_r: int = 128  # Changed from 64 to 128 to match checkpoint
-    lora_alpha: int = 256  # Changed from 16 to 256 to match checkpoint
+    lora_r: int = 128  # Updated to match checkpoint
+    lora_alpha: int = 256  # Updated to match checkpoint
     lora_dropout: float = 0.05
     lora_weight_path: str = ""
     lora_bias: str = "none"
     mm_projector_lr: Optional[float] = None
     group_by_modality_length: bool = field(default=False)
-    output_dir: str = field(default="./output")
-    per_device_eval_batch_size: int = field(default=1)
-    dataloader_num_workers: int = field(default=1)
-    bf16: bool = field(default=True)
-    tf16: bool = field(default=True)
+    
+    # Required attributes for inference
+    local_rank: int = field(default=-1)
     fp16: bool = field(default=False)
-    local_rank: int = field(default=0)
-    world_size: int = field(default=1)
-    ddp_backend: str = field(default="nccl")
-    seed: int = field(default=42)
-    gradient_checkpointing: bool = field(default=True)  # Required by inference scripts
+    bf16: bool = field(default=True)
+    gradient_checkpointing: bool = field(default=True)
+    tune_mm_mlp_adapter: bool = field(default=False)
+    freeze_mm_mlp_adapter: bool = field(default=False)
+    mm_use_im_start_end: bool = field(default=False)
+    use_im_start_end: bool = field(default=False)
+    mm_use_im_patch_token: bool = field(default=True)
     fsdp: str = field(default="")  # Fully Sharded Data Parallel
-    device: str = field(default="cuda")
+    device: str = field(default="cuda")  # Changed to cuda for Kaggle
 
     def __post_init__(self):
-        """Automatically set cache_dir to pendrive if local model not found"""
+        """Kaggle-specific path configuration"""
         if self.cache_dir is None:
-            # Check if LLaVA model exists locally
-            local_model_path = os.path.expanduser("~/.cache/huggingface/hub/models--liuhaotian--llava-v1.5-7b")
-            pendrive_model_path = "/media/sss/satti/huggingface_models"
-
-            if os.path.exists(local_model_path):
-                self.cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-            elif os.path.exists(pendrive_model_path):
-                self.cache_dir = "/media/sss/satti/huggingface_models"
+            # Kaggle dataset paths
+            kaggle_huggingface_path = "/kaggle/input/shivasubhans/llava_huggingface"
+            
+            if os.path.exists(kaggle_huggingface_path):
+                self.cache_dir = kaggle_huggingface_path
+                print(f"✓ Using Kaggle Hugging Face cache: {self.cache_dir}")
             else:
-                # Default to local cache, will download if needed
+                # Fallback to default cache
                 self.cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+                print(f"⚠ Kaggle path not found, using default: {self.cache_dir}")
 
 
 def get_checkpoint_path():
-    """Get the checkpoint path, preferring local then pendrive"""
-    local_checkpoint = "checkpoints/try_7b_lr1e_4_v3_garmentcontrol_4h100_v4_final/pytorch_model.bin"
-    pendrive_checkpoint = "/media/sss/satti/checkpoints/pytorch_model.bin"
-
-    if os.path.exists(local_checkpoint):
-        return local_checkpoint
-    elif os.path.exists(pendrive_checkpoint):
-        return pendrive_checkpoint
+    """Get checkpoint path from Kaggle dataset"""
+    kaggle_checkpoint = "/kaggle/input/shivasubhans/llava_finetuned/pytorch_model.bin"
+    
+    if os.path.exists(kaggle_checkpoint):
+        print(f"✓ Using Kaggle checkpoint: {kaggle_checkpoint}")
+        return kaggle_checkpoint
     else:
-        raise FileNotFoundError(f"Checkpoint not found locally ({local_checkpoint}) or on pendrive ({pendrive_checkpoint})")
+        raise FileNotFoundError(f"Checkpoint not found at: {kaggle_checkpoint}")
 
 
 def rank0_print(*args):

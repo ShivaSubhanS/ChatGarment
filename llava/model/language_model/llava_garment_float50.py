@@ -80,7 +80,8 @@ class GarmentGPTFloat50ForCausalLM(LlavaLlamaForCausalLM):
         float_labels: Optional[torch.FloatTensor] = None,
         float_weight: Optional[torch.FloatTensor] = None,
         inference: Optional[bool] = False,
-        # input_ids_backup: Optional[torch.LongTensor] = None,
+        cache_position: Optional[torch.LongTensor] = None,  # Added for transformers compatibility
+        **kwargs  # Catch any other unexpected arguments
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         if inputs_embeds is not None:
@@ -180,7 +181,13 @@ class GarmentGPTFloat50ForCausalLM(LlavaLlamaForCausalLM):
         max_new_tokens=32,
         tokenizer=None,
     ):  
+        print("    DEBUG [evaluate]: Starting evaluation...")
+        print(f"    DEBUG [evaluate]: images_clip shape: {images_clip.shape}, device: {images_clip.device}, dtype: {images_clip.dtype}")
+        print(f"    DEBUG [evaluate]: input_ids shape: {input_ids.shape}, device: {input_ids.device}")
+        print(f"    DEBUG [evaluate]: max_new_tokens: {max_new_tokens}")
+        
         with torch.no_grad():
+            print("    DEBUG [evaluate]: Calling self.generate()...")
             outputs = self.generate(
                 images=images_clip,
                 inputs=input_ids,
@@ -190,37 +197,54 @@ class GarmentGPTFloat50ForCausalLM(LlavaLlamaForCausalLM):
                 return_dict_in_generate=True,
                 inference=True
             )
+            print("    DEBUG [evaluate]: Generation completed")
+            print(f"    DEBUG [evaluate]: Output sequences shape: {outputs.sequences.shape}")
+            
             # print('output_hidden_states', len(outputs.sequences[0]), outputs.sequences[0].shape, 
             #       len(outputs.hidden_states), outputs.hidden_states[-1][0].shape)
             # output_hidden_states 1001 torch.Size([1001]) 1000 torch.Size([1, 1, 4096])
+            print(f"    DEBUG [evaluate]: Processing hidden states, count: {len(outputs.hidden_states)}")
             output_hidden_states = [item[-1] for item in outputs.hidden_states[1:]]
             output_hidden_states = torch.cat(output_hidden_states, dim=1)
+            print(f"    DEBUG [evaluate]: Concatenated hidden states shape: {output_hidden_states.shape}")
+            
             output_ids = outputs.sequences
+            print(f"    DEBUG [evaluate]: Output IDs shape: {output_ids.shape}")
 
             seg_token_mask = output_ids[:, 2:] == self.seg_token_idx
+            seg_token_count = seg_token_mask.sum().item()
+            print(f"    DEBUG [evaluate]: SEG token count: {seg_token_count}")
 
             if seg_token_mask.sum() > 0:
+                print("    DEBUG [evaluate]: Processing SEG tokens...")
                 last_hidden_state = self.float_layer(output_hidden_states).reshape(1, -1, self.last_dim)
+                print(f"    DEBUG [evaluate]: Last hidden state shape: {last_hidden_state.shape}")
                 # last_hidden_state = self.float_layer(output_hidden_states).reshape(1, -1, 1)
                 pred_embeddings = last_hidden_state[seg_token_mask]
+                print(f"    DEBUG [evaluate]: Pred embeddings shape: {pred_embeddings.shape}")
 
                 seg_token_counts = seg_token_mask.int().sum(-1)  # [bs, ]
                 seg_token_offset = seg_token_counts.cumsum(-1)
                 seg_token_offset = torch.cat(
                     [torch.zeros(1).long().cuda(), seg_token_offset], dim=0
                 )
+                print(f"    DEBUG [evaluate]: SEG token offsets: {seg_token_offset.tolist()}")
 
                 pred_embeddings_ = []
                 for i in range(len(seg_token_offset) - 1):
                     start_i, end_i = seg_token_offset[i], seg_token_offset[i + 1]
                     pred_embeddings_.append(pred_embeddings[start_i:end_i])
+                print(f"    DEBUG [evaluate]: Split embeddings into {len(pred_embeddings_)} parts")
                 pred_embeddings = pred_embeddings_
                 
                 ### -------------------------- SMPL decoder part: embedding -> SMPL parameters and corresponding losses -------------------------- ###
                 text_embeddings = torch.cat(pred_embeddings, dim=0)
+                print(f"    DEBUG [evaluate]: Final text embeddings shape: {text_embeddings.shape}")
             else:
+                print("    DEBUG [evaluate]: No SEG tokens found, returning None for embeddings")
                 text_embeddings = None
 
+        print("    DEBUG [evaluate]: Evaluation completed successfully")
         return output_ids, text_embeddings, seg_token_mask
 
 

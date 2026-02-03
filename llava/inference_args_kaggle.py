@@ -79,16 +79,16 @@ class TrainingArguments:
     def __post_init__(self):
         """Kaggle-specific path configuration"""
         if self.cache_dir is None:
-            # Kaggle dataset paths (corrected)
-            kaggle_huggingface_path = "/kaggle/input/llava-huggingface"
+            # Use writable cache directory (input is read-only in Kaggle)
+            kaggle_cache_path = "/kaggle/working/hf_cache"
             
-            if os.path.exists(kaggle_huggingface_path):
-                self.cache_dir = kaggle_huggingface_path
-                print(f"✓ Using Kaggle Hugging Face cache: {self.cache_dir}")
+            if os.path.exists(kaggle_cache_path):
+                self.cache_dir = kaggle_cache_path
+                print(f"✓ Using Kaggle writable cache: {self.cache_dir}")
             else:
                 # Fallback to default cache
                 self.cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-                print(f"⚠ Kaggle path not found, using default: {self.cache_dir}")
+                print(f"⚠ Kaggle cache not found, using default: {self.cache_dir}")
 
 
 def get_checkpoint_path():

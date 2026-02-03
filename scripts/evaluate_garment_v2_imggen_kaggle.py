@@ -310,16 +310,17 @@ def main(args):
     model.config.tokenizer_padding_side = tokenizer.padding_side
     model.config.tokenizer_model_max_length = tokenizer.model_max_length
 
-    model.config.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter = model_args.tune_mm_mlp_adapter
-    assert not model_args.tune_mm_mlp_adapter
+    # Use training_args for these fields (moved from model_args to avoid conflicts)
+    model.config.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter
+    assert not training_args.tune_mm_mlp_adapter
     
     assert not training_args.freeze_mm_mlp_adapter
     model.config.freeze_mm_mlp_adapter = training_args.freeze_mm_mlp_adapter
 
-    model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = model_args.mm_use_im_start_end
+    model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = training_args.mm_use_im_start_end
     model.config.mm_projector_lr = training_args.mm_projector_lr
-    training_args.use_im_start_end = model_args.mm_use_im_start_end
-    model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
+    training_args.use_im_start_end = training_args.mm_use_im_start_end
+    model.config.mm_use_im_patch_token = training_args.mm_use_im_patch_token
     model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
     
     # Move model to GPU for Kaggle

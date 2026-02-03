@@ -310,7 +310,12 @@ def main(args):
     model.config.tokenizer_padding_side = tokenizer.padding_side
     model.config.tokenizer_model_max_length = tokenizer.model_max_length
 
-    # Use training_args for these fields (moved from model_args to avoid conflicts)
+    # Copy values from training_args to model_args for llava_arch.py compatibility
+    model_args.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter
+    model_args.mm_use_im_start_end = training_args.mm_use_im_start_end
+    model_args.mm_use_im_patch_token = training_args.mm_use_im_patch_token
+    
+    # Use training_args for model config
     model.config.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter
     assert not training_args.tune_mm_mlp_adapter
     

@@ -14,6 +14,12 @@ class ModelArguments:
     mm_projector_type: Optional[str] = field(default='linear')
     mm_patch_merge_type: Optional[str] = field(default='flat')
     mm_vision_select_feature: Optional[str] = field(default="patch")
+    
+    # These fields exist for compatibility with llava_arch.py but are not CLI arguments
+    # The actual values come from TrainingArguments
+    tune_mm_mlp_adapter: bool = False
+    mm_use_im_start_end: bool = False
+    mm_use_im_patch_token: bool = True
 
 
 @dataclass

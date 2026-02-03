@@ -308,11 +308,26 @@ def main(args):
     model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
     model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
     
-    # Keep model on CPU to save GPU memory
-    print("\nStep 9: Keeping model on CPU to conserve GPU memory...")
+    # Move model to GPU - Multi-GPU support
+    print("\nStep 9: Moving model to GPU...")
     assert args.precision == "bf16"
-    model = model.bfloat16()  # Keep on CPU, no .cuda()
-    print("   ✓ Model configured for CPU inference")
+    model = model.bfloat16()
+    
+    # Check number of available GPUs
+    num_gpus = torch.cuda.device_count()
+    print(f"   - Number of GPUs available: {num_gpus}")
+    
+    if num_gpus > 1:
+        print(f"   - Using DataParallel across {num_gpus} GPUs")
+        # Use DataParallel to distribute model across multiple GPUs
+        model = torch.nn.DataParallel(model)
+        model = model.cuda()
+        device = torch.device("cuda")
+        print(f"   ✓ Model distributed across {num_gpus} GPUs")
+    else:
+        model = model.cuda()
+        device = torch.device("cuda")
+        print(f"   ✓ Model configured for single GPU inference on {device}")
     
     print("\nStep 10: Preparing dataset...")
     print(f"   - Data path: {data_args.data_path_eval}")
@@ -327,12 +342,17 @@ def main(args):
     print("\nStep 11: Loading fine-tuned checkpoint...")
     resume_path = get_checkpoint_path()
     print(f"   - Checkpoint path: {resume_path}")
-    state_dict = torch.load(resume_path, map_location="cpu")
+    state_dict = torch.load(resume_path, map_location="cpu")  # Load to CPU first
     print("   - Loading state dict...")
-    model.load_state_dict(state_dict, strict=True)
-    model = model.bfloat16()  # Keep on CPU
-    device = torch.device("cpu")  # Set device to CPU
-    print("   ✓ Checkpoint loaded successfully")
+    
+    # Handle DataParallel state dict if needed
+    if num_gpus > 1:
+        # If model is wrapped in DataParallel, adjust state dict keys
+        model.module.load_state_dict(state_dict, strict=True)
+        print("   ✓ Checkpoint loaded successfully (DataParallel)")
+    else:
+        model.load_state_dict(state_dict, strict=True)
+        print("   ✓ Checkpoint loaded successfully")
 
     if data_args.data_path_eval[-1] == '/':
         data_args.data_path_eval = data_args.data_path_eval[:-1]
@@ -402,13 +422,15 @@ def main(args):
             input_ids = tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
             print(f"DEBUG: Input IDs shape: {input_ids.shape}")
             
-            # Keep input_ids on CPU since model is on CPU
-            input_ids = input_ids.unsqueeze(0).to("cpu")
-            print(f"DEBUG: Input IDs moved to CPU, shape: {input_ids.shape}, device: {input_ids.device}")
+            # Move input_ids to GPU
+            input_ids = input_ids.unsqueeze(0).to("cuda")
+            print(f"DEBUG: Input IDs moved to GPU, shape: {input_ids.shape}, device: {input_ids.device}")
 
             print("DEBUG: Starting model.evaluate()...")
-            output_ids, float_preds, seg_token_mask = model.evaluate(
-                image_clip,  # This will be moved to GPU inside the model for vision tower
+            # Handle DataParallel wrapper
+            model_to_eval = model.module if hasattr(model, 'module') else model
+            output_ids, float_preds, seg_token_mask = model_to_eval.evaluate(
+                image_clip,
                 image,
                 input_ids,
                 max_new_tokens=2048,

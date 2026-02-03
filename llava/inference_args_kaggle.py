@@ -14,13 +14,6 @@ class ModelArguments:
     mm_projector_type: Optional[str] = field(default='linear')
     mm_patch_merge_type: Optional[str] = field(default='flat')
     mm_vision_select_feature: Optional[str] = field(default="patch")
-    
-    # These fields exist for compatibility with llava_arch.py but are not CLI arguments
-    # The actual values come from TrainingArguments
-    tune_mm_mlp_adapter: bool = False
-    mm_use_im_start_end: bool = False
-    mm_use_im_patch_token: bool = True
-
 
 @dataclass
 class DataArguments:
@@ -86,8 +79,8 @@ class TrainingArguments:
     def __post_init__(self):
         """Kaggle-specific path configuration"""
         if self.cache_dir is None:
-            # Kaggle dataset paths
-            kaggle_huggingface_path = "/kaggle/input/shivasubhans/llava_huggingface"
+            # Kaggle dataset paths (corrected)
+            kaggle_huggingface_path = "/kaggle/input/llava-huggingface"
             
             if os.path.exists(kaggle_huggingface_path):
                 self.cache_dir = kaggle_huggingface_path
@@ -100,7 +93,7 @@ class TrainingArguments:
 
 def get_checkpoint_path():
     """Get checkpoint path from Kaggle dataset"""
-    kaggle_checkpoint = "/kaggle/input/shivasubhans/llava_finetuned/pytorch_model.bin"
+    kaggle_checkpoint = "/kaggle/input/llava-finetuned/pytorch_model.bin"
     
     if os.path.exists(kaggle_checkpoint):
         print(f"✓ Using Kaggle checkpoint: {kaggle_checkpoint}")

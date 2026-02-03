@@ -4,8 +4,22 @@ import argparse
 import json
 from pathlib import Path
 
-# add the path of GarmentCode
-sys.path.insert(1, '/home/sss/project/pose_3d/GarmentCodeRC/')
+# Auto-detect GarmentCodeRC path
+if os.path.exists('/kaggle/working/GarmentCodeRC'):
+    # Kaggle environment
+    garmentcode_path = '/kaggle/working/GarmentCodeRC/'
+elif os.path.exists('/home/sss/project/pose_3d/GarmentCodeRC/'):
+    # Local environment
+    garmentcode_path = '/home/sss/project/pose_3d/GarmentCodeRC/'
+else:
+    # Try relative path
+    garmentcode_path = os.path.join(os.path.dirname(__file__), '../GarmentCodeRC/')
+    if not os.path.exists(garmentcode_path):
+        raise RuntimeError("GarmentCodeRC not found! Please clone it or set the correct path.")
+
+if garmentcode_path not in sys.path:
+    sys.path.insert(1, garmentcode_path)
+
 from assets.garment_programs.meta_garment import MetaGarment
 from assets.bodies.body_params import BodyParameters
 

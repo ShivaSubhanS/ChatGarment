@@ -367,6 +367,7 @@ def run_garmentcode_sim(json_paths_json):
 
 
 def run_garmentcode_parser_float50(all_json_spec_files, json_output, float_preds, output_dir):
+    # Check what keys are available
     if 'upperbody_garment' in json_output:
         upper_config = json_output['upperbody_garment']
         lower_config = json_output['lowerbody_garment']
@@ -389,7 +390,7 @@ def run_garmentcode_parser_float50(all_json_spec_files, json_output, float_preds
         all_json_spec_files.append(
             os.path.join(output_dir, 'valid_garment_lower', f'valid_garment_lower_specification.json')
         )
-    else:
+    elif 'wholebody_garment' in json_output:
         wholebody_config = json_output['wholebody_garment']
 
         float_preds = float_preds.reshape(-1)
@@ -403,6 +404,11 @@ def run_garmentcode_parser_float50(all_json_spec_files, json_output, float_preds
         all_json_spec_files.append(
             os.path.join(output_dir, 'valid_garment_wholebody', f'valid_garment_wholebody_specification.json')
         )
+    else:
+        print(f"WARNING: No valid garment config found in JSON output. Available keys: {list(json_output.keys())}")
+        print(f"JSON output preview: {str(json_output)[:500]}")
+        # Return empty list to skip this garment
+        return all_json_spec_files
     
     return all_json_spec_files
 

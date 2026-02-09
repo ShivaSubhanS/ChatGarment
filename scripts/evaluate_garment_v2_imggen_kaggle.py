@@ -412,6 +412,10 @@ def main(args):
     len_val_dataset = len(val_dataset)
     # model.eval()
     
+    # Limit to 1 image for testing
+    len_val_dataset = min(1, len_val_dataset)
+    print(f"\n⚠ LIMITED TO PROCESSING {len_val_dataset} IMAGE(S) FOR TESTING\n")
+    
     # hmr_batch = next(iter(train_dataset))
     random.seed(0)
     all_output_dir = []

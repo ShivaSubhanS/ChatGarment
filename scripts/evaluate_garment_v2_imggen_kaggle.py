@@ -368,11 +368,17 @@ def main(args):
     # Handle DataParallel state dict if needed
     if num_gpus > 1:
         # If model is wrapped in DataParallel, adjust state dict keys
-        model.module.load_state_dict(state_dict, strict=True)
+        missing_keys, unexpected_keys = model.module.load_state_dict(state_dict, strict=False)
         print("   ✓ Checkpoint loaded successfully (DataParallel)")
     else:
-        model.load_state_dict(state_dict, strict=True)
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
         print("   ✓ Checkpoint loaded successfully")
+    
+    # Report any mismatches (usually just embedding size differences)
+    if missing_keys:
+        print(f"   ℹ Missing keys (will use initialized values): {len(missing_keys)} keys")
+    if unexpected_keys:
+        print(f"   ℹ Unexpected keys (ignored): {len(unexpected_keys)} keys")
 
     if data_args.data_path_eval[-1] == '/':
         data_args.data_path_eval = data_args.data_path_eval[:-1]

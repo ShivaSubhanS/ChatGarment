@@ -365,18 +365,34 @@ def main(args):
     state_dict = torch.load(resume_path, map_location="cpu")  # Load to CPU first
     print("   - Loading state dict...")
     
-    # Handle DataParallel state dict if needed
-    if num_gpus > 1:
-        # If model is wrapped in DataParallel, adjust state dict keys
-        missing_keys, unexpected_keys = model.module.load_state_dict(state_dict, strict=False)
-        print("   ✓ Checkpoint loaded successfully (DataParallel)")
-    else:
-        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
-        print("   ✓ Checkpoint loaded successfully")
+    # Handle vocab size mismatch (32001 in checkpoint vs 32002 in model)
+    model_to_load = model.module if num_gpus > 1 else model
+    current_state = model_to_load.state_dict()
     
-    # Report any mismatches (usually just embedding size differences)
+    # Fix embedding size mismatches
+    embed_keys = ['base_model.model.model.embed_tokens.weight', 'base_model.model.lm_head.weight']
+    for key in embed_keys:
+        if key in state_dict and key in current_state:
+            ckpt_shape = state_dict[key].shape
+            model_shape = current_state[key].shape
+            if ckpt_shape != model_shape:
+                print(f"   ℹ Resizing {key}: {ckpt_shape} -> {model_shape}")
+                # Copy the checkpoint weights for the overlapping vocab
+                min_vocab_size = min(ckpt_shape[0], model_shape[0])
+                current_state[key][:min_vocab_size] = state_dict[key][:min_vocab_size]
+                # Remove from state_dict to avoid loading error
+                del state_dict[key]
+    
+    # Load the rest of the weights
+    missing_keys, unexpected_keys = model_to_load.load_state_dict(state_dict, strict=False)
+    print("   ✓ Checkpoint loaded successfully")
+    
+    # Report any mismatches
     if missing_keys:
-        print(f"   ℹ Missing keys (will use initialized values): {len(missing_keys)} keys")
+        # Filter out the embedding keys we already handled
+        other_missing = [k for k in missing_keys if k not in embed_keys]
+        if other_missing:
+            print(f"   ℹ Missing keys: {len(other_missing)} keys")
     if unexpected_keys:
         print(f"   ℹ Unexpected keys (ignored): {len(unexpected_keys)} keys")
 

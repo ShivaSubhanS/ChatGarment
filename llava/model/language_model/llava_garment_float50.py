@@ -211,9 +211,11 @@ class GarmentGPTFloat50ForCausalLM(LlavaLlamaForCausalLM):
             output_ids = outputs.sequences
             print(f"    DEBUG [evaluate]: Output IDs shape: {output_ids.shape}")
 
-            seg_token_mask = output_ids[:, 2:] == self.seg_token_idx
+            # Hidden states start from position 1 (outputs.hidden_states[1:]), so we skip 1 token
+            seg_token_mask = output_ids[:, 1:] == self.seg_token_idx
             seg_token_count = seg_token_mask.sum().item()
             print(f"    DEBUG [evaluate]: SEG token count: {seg_token_count}")
+            print(f"    DEBUG [evaluate]: seg_token_mask shape: {seg_token_mask.shape}")
 
             if seg_token_mask.sum() > 0:
                 print("    DEBUG [evaluate]: Processing SEG tokens...")

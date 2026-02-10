@@ -4,6 +4,10 @@ import argparse
 import json
 from pathlib import Path
 
+# Add custom Warp fork to path
+if '/tmp/NvidiaWarp-GarmentCode' not in sys.path:
+    sys.path.insert(0, '/tmp/NvidiaWarp-GarmentCode')
+
 # Auto-detect GarmentCodeRC path
 if os.path.exists('/kaggle/working/GarmentCodeRC'):
     # Kaggle environment
@@ -19,6 +23,15 @@ else:
 
 if garmentcode_path not in sys.path:
     sys.path.insert(1, garmentcode_path)
+
+# Auto-create system.json if it doesn't exist
+system_json_path = os.path.join(garmentcode_path, 'system.json')
+if not os.path.exists(system_json_path):
+    template_path = os.path.join(garmentcode_path, 'system.template.json')
+    if os.path.exists(template_path):
+        import shutil
+        shutil.copy(template_path, system_json_path)
+        print(f"Created {system_json_path} from template")
 
 from assets.garment_programs.meta_garment import MetaGarment
 from assets.bodies.body_params import BodyParameters
@@ -36,6 +49,14 @@ def run_simultion_warp(pattern_spec, sim_config, output_path, easy_texture_path)
     spec_path = Path(pattern_spec)
     garment_name, _, _ = spec_path.stem.rpartition('_')  # assuming ending in '_specification'
 
+    # Get GarmentCodeRC path
+    if os.path.exists('/kaggle/working/GarmentCodeRC'):
+        garmentcode_path = '/kaggle/working/GarmentCodeRC/'
+    elif os.path.exists('/home/sss/project/pose_3d/GarmentCodeRC/'):
+        garmentcode_path = '/home/sss/project/pose_3d/GarmentCodeRC/'
+    else:
+        garmentcode_path = os.path.join(os.path.dirname(__file__), '../GarmentCodeRC/')
+
     paths = PathCofig(
         in_element_path=spec_path.parent,  
         out_path=output_path, 
@@ -43,7 +64,7 @@ def run_simultion_warp(pattern_spec, sim_config, output_path, easy_texture_path)
         body_name='mean_all',    # 'f_smpl_average_A40'
         smpl_body=False,   # NOTE: depends on chosen body model
         add_timestamp=False,
-        system_path='/home/sss/project/pose_3d/GarmentCodeRC/system.json',
+        system_path=os.path.join(garmentcode_path, 'system.json'),
         easy_texture_path=easy_texture_path
     )
 

@@ -385,7 +385,13 @@ def main(args):
         
         answers = []
         question1 = 'Can you describe the geometry features of the garments worn by the model in the Json format?'
-        question2 = 'Can you estimate the sewing pattern code based on the image and Json format garment geometry description?'
+        question2 = '''Can you estimate the sewing pattern code based on the image and Json format garment geometry description?
+
+IMPORTANT RULES:
+1. For wholebody_garment (dress/jumpsuit): MUST have BOTH 'upper' AND 'bottom' components in meta. If it's a dress with a skirt, set 'bottom' to an appropriate skirt type (e.g., 'SkirtCircle' for flared, 'Skirt2' for A-line, 'PencilSkirt' for fitted, 'Pants' for jumpsuit).
+2. For upperbody_garment (shirt/top only): 'bottom' should be null.
+3. For lowerbody_garment (skirt/pants only): 'upper' should be null.
+4. Check the garment_name and geometry description carefully - if it mentions 'dress', 'skirt', 'flared skirt', etc., ensure 'bottom' is NOT null.'''
         visualizations = []
         questions = [question1, question2]
         

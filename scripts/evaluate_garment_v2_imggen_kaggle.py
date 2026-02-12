@@ -43,8 +43,17 @@ from llava.garment_utils_v2 import run_garmentcode_parser_float50
 import json
 from tqdm import tqdm
 import re 
+import gc
 
 os.environ["MASTER_PORT"] = "23499"
+
+# Memory optimization settings for Kaggle T4 x2
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True,max_split_size_mb:512'
+
+# Enable TF32 for faster computation
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+torch.backends.cudnn.benchmark = True
 
 
 def find_all_linear_names(model, lora_target_modules=['q_proj', 'v_proj']):
@@ -166,9 +175,19 @@ def main(args):
     print("Starting ChatGarment Inference on Kaggle GPU")
     print("="*80 + "\n")
     
+    # Clear GPU memory at start
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        gc.collect()
+    
     # Check GPU availability
     if torch.cuda.is_available():
         print(f"✓ GPU Available: {torch.cuda.get_device_name(0)}")
+        num_gpus = torch.cuda.device_count()
+        print(f"✓ Number of GPUs: {num_gpus}")
+        for i in range(num_gpus):
+            total_mem = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+            print(f"  - GPU {i}: {torch.cuda.get_device_name(i)} ({total_mem:.1f} GB)")
         print(f"✓ GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
     else:
         print("⚠ WARNING: No GPU detected! Using CPU (will be slow)")
@@ -333,14 +352,21 @@ def main(args):
     assert args.precision == "bf16"
     model = model.bfloat16()
     
+    # Enable memory-efficient settings
+    model.config.use_cache = False  # Disable KV cache to save memory
+    
     # Check number of available GPUs
     num_gpus = torch.cuda.device_count()
     print(f"   - Number of GPUs available: {num_gpus}")
     
+    # Clear any existing GPU cache
+    torch.cuda.empty_cache()
+    print("   - Cleared GPU cache")
+    
     if num_gpus > 1:
         print(f"   - Using DataParallel across {num_gpus} GPUs")
         # Use DataParallel to distribute model across multiple GPUs
-        model = torch.nn.DataParallel(model)
+        model = torch.nn.DataParallel(model, device_ids=list(range(num_gpus)))
         model = model.cuda()
         device = torch.device("cuda")
         print(f"   ✓ Model distributed across {num_gpus} GPUs")
@@ -348,6 +374,12 @@ def main(args):
         model = model.cuda()
         device = torch.device("cuda")
         print(f"   ✓ Model configured for single GPU inference on {device}")
+    
+    # Print memory stats
+    for i in range(num_gpus):
+        allocated = torch.cuda.memory_allocated(i) / (1024**3)
+        reserved = torch.cuda.memory_reserved(i) / (1024**3)
+        print(f"   - GPU {i}: {allocated:.2f} GB allocated, {reserved:.2f} GB reserved")
     
     print("\nStep 10: Preparing dataset...")
     print(f"   - Data path: {data_args.data_path_eval}")
@@ -387,6 +419,11 @@ def main(args):
     missing_keys, unexpected_keys = model_to_load.load_state_dict(state_dict, strict=False)
     print("   ✓ Checkpoint loaded successfully")
     
+    # Clear checkpoint from memory
+    del state_dict
+    torch.cuda.empty_cache()
+    gc.collect()
+    
     # Report any mismatches
     if missing_keys:
         # Filter out the embedding keys we already handled
@@ -395,6 +432,20 @@ def main(args):
             print(f"   ℹ Missing keys: {len(other_missing)} keys")
     if unexpected_keys:
         print(f"   ℹ Unexpected keys (ignored): {len(unexpected_keys)} keys")
+    
+    # Set model to evaluation mode
+    print("\nStep 12: Setting model to evaluation mode...")
+    model.eval()
+    print("   ✓ Model set to eval mode")
+    
+    # Print final memory stats
+    print("\n   Final memory usage:")
+    for i in range(num_gpus):
+        allocated = torch.cuda.memory_allocated(i) / (1024**3)
+        reserved = torch.cuda.memory_reserved(i) / (1024**3)
+        total = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+        free = total - allocated
+        print(f"   - GPU {i}: {allocated:.2f}GB used / {total:.2f}GB total / {free:.2f}GB free")
 
     if data_args.data_path_eval[-1] == '/':
         data_args.data_path_eval = data_args.data_path_eval[:-1]
@@ -468,8 +519,8 @@ IMPORTANT RULES:
             image_clip = data_item['image']
             print(f"DEBUG: Image tensor shape: {image_clip.shape}, dtype: {image_clip.dtype}")
             
-            # Move image to GPU
-            image_clip = image_clip.unsqueeze(0).to("cuda")
+            # Move image to GPU - use GPU 0 explicitly for DataParallel
+            image_clip = image_clip.unsqueeze(0).to("cuda:0")
             assert args.precision == "bf16"
             image_clip = image_clip.bfloat16()
             print(f"DEBUG: Image moved to GPU, shape: {image_clip.shape}, device: {image_clip.device}")
@@ -479,21 +530,30 @@ IMPORTANT RULES:
             input_ids = tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
             print(f"DEBUG: Input IDs shape: {input_ids.shape}")
             
-            # Move input_ids to GPU
-            input_ids = input_ids.unsqueeze(0).to("cuda")
+            # Move input_ids to GPU - use GPU 0 explicitly for DataParallel
+            input_ids = input_ids.unsqueeze(0).to("cuda:0")
             print(f"DEBUG: Input IDs moved to GPU, shape: {input_ids.shape}, device: {input_ids.device}")
 
             print("DEBUG: Starting model.evaluate()...")
+            # Clear GPU cache before inference
+            torch.cuda.empty_cache()
+            
             # Handle DataParallel wrapper
             model_to_eval = model.module if hasattr(model, 'module') else model
+            
+            # Memory-efficient generation settings
+            # Reduced max_new_tokens from 2048 to 1024 to save memory
             output_ids, float_preds, seg_token_mask = model_to_eval.evaluate(
                 image_clip,
                 image,
                 input_ids,
-                max_new_tokens=2048,
+                max_new_tokens=1024,  # Reduced from 2048 to save memory
                 tokenizer=tokenizer,
             )
             print("DEBUG: Model evaluation completed")
+            
+            # Clear GPU cache after inference
+            torch.cuda.empty_cache()
 
             output_ids = output_ids[0, 1:]
             text_output = tokenizer.decode(output_ids, skip_special_tokens=False).strip().replace("</s>", "")

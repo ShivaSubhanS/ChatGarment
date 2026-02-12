@@ -109,14 +109,14 @@ class GarmentGPTFloat50ForCausalLM(LlavaLlamaForCausalLM):
             seg_token_mask = torch.cat(
                 [
                     seg_token_mask,
-                    torch.zeros((seg_token_mask.shape[0], 1)).bool().cuda(),
+                    torch.zeros((seg_token_mask.shape[0], 1)).bool().to(seg_token_mask.device),
                 ],
                 dim=1,
             )
 
             padded_len = output_hidden_states[-1].shape[1] - seg_token_mask.shape[1]
             seg_token_mask = torch.cat(
-                    [torch.zeros((seg_token_mask.shape[0], padded_len)).bool().cuda(), seg_token_mask],
+                    [torch.zeros((seg_token_mask.shape[0], padded_len)).bool().to(seg_token_mask.device), seg_token_mask],
                     dim=1,
                 )
         
@@ -132,7 +132,7 @@ class GarmentGPTFloat50ForCausalLM(LlavaLlamaForCausalLM):
             seg_token_counts = seg_token_mask.int().sum(-1)  # [bs, ]
             seg_token_offset = seg_token_counts.cumsum(-1)
             seg_token_offset = torch.cat(
-                [torch.zeros(1).long().cuda(), seg_token_offset], dim=0
+                [torch.zeros(1).long().to(seg_token_counts.device), seg_token_offset], dim=0
             )
 
             pred_embeddings_ = []
@@ -228,7 +228,7 @@ class GarmentGPTFloat50ForCausalLM(LlavaLlamaForCausalLM):
                 seg_token_counts = seg_token_mask.int().sum(-1)  # [bs, ]
                 seg_token_offset = seg_token_counts.cumsum(-1)
                 seg_token_offset = torch.cat(
-                    [torch.zeros(1).long().cuda(), seg_token_offset], dim=0
+                    [torch.zeros(1).long().to(seg_token_counts.device), seg_token_offset], dim=0
                 )
                 print(f"    DEBUG [evaluate]: SEG token offsets: {seg_token_offset.tolist()}")
 

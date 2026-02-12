@@ -148,6 +148,8 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
             print(f"      DEBUG [generate]: Embedded tokens shape: {inputs_embeds.shape}")
 
         print("      DEBUG [generate]: Calling super().generate()...")
+        # Force use_cache=False to save memory during generation
+        kwargs['use_cache'] = False
         result = super().generate(
             position_ids=position_ids,
             attention_mask=attention_mask,

@@ -284,15 +284,24 @@ def main(args):
     )
     
     vision_tower = model.get_vision_tower()
-    # Move vision tower to GPU
-    print("   - Moving vision tower to GPU...")
-    vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device="cuda")
-    print("   ✓ Vision tower ready on GPU")
     
-    # Move mm_projector to GPU
-    print("   - Moving mm_projector to GPU...")
-    model.get_model().mm_projector.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device="cuda")
-    print("   ✓ mm_projector ready on GPU")
+    # Check GPU availability for smart placement
+    num_gpus = torch.cuda.device_count()
+    
+    # Move vision tower to GPU 1 if available (to split memory load)
+    if num_gpus > 1:
+        print("   - Moving vision tower to GPU 1...")
+        vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device="cuda:1")
+        print("   ✓ Vision tower ready on GPU 1")
+    else:
+        print("   - Moving vision tower to GPU 0...")
+        vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device="cuda:0")
+        print("   ✓ Vision tower ready on GPU 0")
+    
+    # Move mm_projector to GPU 0 (same as main model)
+    print("   - Moving mm_projector to GPU 0...")
+    model.get_model().mm_projector.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device="cuda:0")
+    print("   ✓ mm_projector ready on GPU 0")
 
     for p in vision_tower.parameters():
         p.requires_grad = False
@@ -347,7 +356,7 @@ def main(args):
     model.config.mm_use_im_patch_token = training_args.mm_use_im_patch_token
     model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
     
-    # Move model to GPU for Kaggle - Multi-GPU support
+    # Move model to GPU for Kaggle - Manual multi-GPU placement
     print("\nStep 9: Moving model to GPU...")
     assert args.precision == "bf16"
     model = model.bfloat16()
@@ -361,25 +370,26 @@ def main(args):
     
     # Clear any existing GPU cache
     torch.cuda.empty_cache()
+    gc.collect()
     print("   - Cleared GPU cache")
     
+    # Always use GPU 0 for main model (vision tower is on GPU 1 if available)
+    print(f"   - Moving main model to GPU 0...")
+    model = model.to("cuda:0")
+    device = torch.device("cuda:0")
+    print(f"   ✓ Main model on GPU 0")
+    
     if num_gpus > 1:
-        print(f"   - Using DataParallel across {num_gpus} GPUs")
-        # Use DataParallel to distribute model across multiple GPUs
-        model = torch.nn.DataParallel(model, device_ids=list(range(num_gpus)))
-        model = model.cuda()
-        device = torch.device("cuda")
-        print(f"   ✓ Model distributed across {num_gpus} GPUs")
+        print(f"   ✓ Using split placement: Vision on GPU 1, Model on GPU 0")
     else:
-        model = model.cuda()
-        device = torch.device("cuda")
-        print(f"   ✓ Model configured for single GPU inference on {device}")
+        print(f"   ✓ Single GPU mode: All on GPU 0")
     
     # Print memory stats
     for i in range(num_gpus):
         allocated = torch.cuda.memory_allocated(i) / (1024**3)
         reserved = torch.cuda.memory_reserved(i) / (1024**3)
-        print(f"   - GPU {i}: {allocated:.2f} GB allocated, {reserved:.2f} GB reserved")
+        total = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+        print(f"   - GPU {i}: {allocated:.2f}GB allocated / {reserved:.2f}GB reserved / {total:.2f}GB total")
     
     print("\nStep 10: Preparing dataset...")
     print(f"   - Data path: {data_args.data_path_eval}")
@@ -398,8 +408,7 @@ def main(args):
     print("   - Loading state dict...")
     
     # Handle vocab size mismatch (32001 in checkpoint vs 32002 in model)
-    model_to_load = model.module if num_gpus > 1 else model
-    current_state = model_to_load.state_dict()
+    current_state = model.state_dict()
     
     # Fix embedding size mismatches
     embed_keys = ['base_model.model.model.embed_tokens.weight', 'base_model.model.lm_head.weight']
@@ -416,7 +425,7 @@ def main(args):
                 del state_dict[key]
     
     # Load the rest of the weights
-    missing_keys, unexpected_keys = model_to_load.load_state_dict(state_dict, strict=False)
+    missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
     print("   ✓ Checkpoint loaded successfully")
     
     # Clear checkpoint from memory
@@ -519,41 +528,45 @@ IMPORTANT RULES:
             image_clip = data_item['image']
             print(f"DEBUG: Image tensor shape: {image_clip.shape}, dtype: {image_clip.dtype}")
             
-            # Move image to GPU - use GPU 0 explicitly for DataParallel
+            # Move image to GPU 0 (where main model is)
             image_clip = image_clip.unsqueeze(0).to("cuda:0")
             assert args.precision == "bf16"
             image_clip = image_clip.bfloat16()
-            print(f"DEBUG: Image moved to GPU, shape: {image_clip.shape}, device: {image_clip.device}")
+            print(f"DEBUG: Image moved to GPU 0, shape: {image_clip.shape}, device: {image_clip.device}")
             
             image = image_clip
 
             input_ids = tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
             print(f"DEBUG: Input IDs shape: {input_ids.shape}")
             
-            # Move input_ids to GPU - use GPU 0 explicitly for DataParallel
+            # Move input_ids to GPU 0 (where main model is)
             input_ids = input_ids.unsqueeze(0).to("cuda:0")
-            print(f"DEBUG: Input IDs moved to GPU, shape: {input_ids.shape}, device: {input_ids.device}")
+            print(f"DEBUG: Input IDs moved to GPU 0, shape: {input_ids.shape}, device: {input_ids.device}")
 
             print("DEBUG: Starting model.evaluate()...")
             # Clear GPU cache before inference
             torch.cuda.empty_cache()
+            gc.collect()
             
-            # Handle DataParallel wrapper
-            model_to_eval = model.module if hasattr(model, 'module') else model
+            # Print memory before generation
+            for gpu_id in range(torch.cuda.device_count()):
+                mem_used = torch.cuda.memory_allocated(gpu_id) / (1024**3)
+                print(f"      GPU {gpu_id} memory before gen: {mem_used:.2f}GB")
             
             # Memory-efficient generation settings
-            # Reduced max_new_tokens from 2048 to 1024 to save memory
-            output_ids, float_preds, seg_token_mask = model_to_eval.evaluate(
+            # Reduced max_new_tokens to 512 (from 2048) to save memory
+            output_ids, float_preds, seg_token_mask = model.evaluate(
                 image_clip,
                 image,
                 input_ids,
-                max_new_tokens=1024,  # Reduced from 2048 to save memory
+                max_new_tokens=512,  # Reduced from 1024 to 512 to fit in memory
                 tokenizer=tokenizer,
             )
             print("DEBUG: Model evaluation completed")
             
             # Clear GPU cache after inference
             torch.cuda.empty_cache()
+            gc.collect()
 
             output_ids = output_ids[0, 1:]
             text_output = tokenizer.decode(output_ids, skip_special_tokens=False).strip().replace("</s>", "")

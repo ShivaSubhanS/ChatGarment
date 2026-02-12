@@ -138,8 +138,25 @@ class LlavaMetaForCausalLM(ABC):
         return self.get_model().get_vision_tower()
 
     def encode_images(self, images):
-        image_features = self.get_model().get_vision_tower()(images)
-        image_features = self.get_model().mm_projector(image_features)
+        # Get vision tower and mm_projector devices
+        vision_tower = self.get_model().get_vision_tower()
+        mm_projector = self.get_model().mm_projector
+        
+        # Move images to vision tower's device
+        vision_device = next(vision_tower.parameters()).device
+        if images.device != vision_device:
+            images = images.to(vision_device)
+        
+        # Process images with vision tower (may be on different GPU)
+        image_features = vision_tower(images)
+        
+        # Transfer features to mm_projector's device if needed
+        mm_device = next(mm_projector.parameters()).device
+        if image_features.device != mm_device:
+            image_features = image_features.to(mm_device)
+        
+        # Process with mm_projector
+        image_features = mm_projector(image_features)
         return image_features
 
     def prepare_inputs_labels_for_multimodal(

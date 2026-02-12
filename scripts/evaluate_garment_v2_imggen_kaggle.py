@@ -554,12 +554,12 @@ IMPORTANT RULES:
                 print(f"      GPU {gpu_id} memory before gen: {mem_used:.2f}GB")
             
             # Memory-efficient generation settings
-            # Reduced max_new_tokens to 512 (from 2048) to save memory
+            # Increased to 768 tokens (was 512) now that vision tower is on GPU 1
             output_ids, float_preds, seg_token_mask = model.evaluate(
                 image_clip,
                 image,
                 input_ids,
-                max_new_tokens=512,  # Reduced from 1024 to 512 to fit in memory
+                max_new_tokens=768,  # Increased from 512 - balanced between memory and output completeness
                 tokenizer=tokenizer,
             )
             print("DEBUG: Model evaluation completed")
@@ -589,8 +589,18 @@ IMPORTANT RULES:
                 garment_id = garment_id.split('.')[0]
                 print(f"DEBUG: Garment ID: {garment_id}")
                 
-                json_output = repair_json(text_output, return_objects=True)
-                print(f"DEBUG: JSON output keys: {list(json_output.keys()) if isinstance(json_output, dict) else 'Not a dict'}")
+                # Parse JSON output
+                try:
+                    json_output = repair_json(text_output, return_objects=True)
+                    if isinstance(json_output, dict):
+                        print(f"DEBUG: JSON output keys: {list(json_output.keys())}")
+                    else:
+                        print(f"DEBUG: JSON output is not a dict. Type: {type(json_output)}")
+                        print(f"DEBUG: JSON output: {str(json_output)[:200]}")
+                except Exception as e:
+                    print(f"ERROR: Failed to parse JSON output: {e}")
+                    print(f"DEBUG: Raw text output (first 500 chars): {text_output[:500]}")
+                    json_output = {}  # Use empty dict as fallback
 
                 saved_dir = os.path.join(parent_folder, 'vis_new', f'valid_garment_{garment_id}')
                 print(f"DEBUG: Saving to directory: {saved_dir}")
@@ -613,8 +623,14 @@ IMPORTANT RULES:
                 shutil.copy(image_path, os.path.join(output_dir, f'gt_image.png'))
                 print("DEBUG: Copied ground truth image")
 
-                all_json_spec_files = run_garmentcode_parser_float50(all_json_spec_files, json_output, float_preds, output_dir)
-                print("DEBUG: Processed garment code parser")
+                try:
+                    all_json_spec_files = run_garmentcode_parser_float50(all_json_spec_files, json_output, float_preds, output_dir)
+                    print("DEBUG: Processed garment code parser successfully")
+                except Exception as e:
+                    print(f"ERROR: Failed to process garment code parser: {e}")
+                    print(f"  Continuing with next image...")
+                    import traceback
+                    traceback.print_exc()
         
         print(f"DEBUG: Completed processing image {i+1}/{len_val_dataset}")
         print(f"{'='*60}\n")

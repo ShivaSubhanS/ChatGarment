@@ -405,8 +405,13 @@ def run_garmentcode_parser_float50(all_json_spec_files, json_output, float_preds
             os.path.join(output_dir, 'valid_garment_wholebody', f'valid_garment_wholebody_specification.json')
         )
     else:
-        print(f"WARNING: No valid garment config found in JSON output. Available keys: {list(json_output.keys())}")
-        print(f"JSON output preview: {str(json_output)[:500]}")
+        # Handle case where json_output is not a dict or doesn't have expected keys
+        if isinstance(json_output, dict):
+            print(f"WARNING: No valid garment config found in JSON output. Available keys: {list(json_output.keys())}")
+            print(f"JSON output preview: {str(json_output)[:500]}")
+        else:
+            print(f"WARNING: JSON output is not a dictionary. Type: {type(json_output)}")
+            print(f"JSON output preview: {str(json_output)[:500]}")
         # Return empty list to skip this garment
         return all_json_spec_files
     

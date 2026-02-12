@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 
 # Add custom Warp fork to path
-if '/tmp/NvidiaWarp-GarmentCode' not in sys.path:
-    sys.path.insert(0, '/tmp/NvidiaWarp-GarmentCode')
+if '/home/sss/project/pose_3d/NvidiaWarp-GarmentCode' not in sys.path:
+    sys.path.insert(0, '/home/sss/project/pose_3d/NvidiaWarp-GarmentCode')
 
 # Auto-detect GarmentCodeRC path
 if os.path.exists('/kaggle/working/GarmentCodeRC'):

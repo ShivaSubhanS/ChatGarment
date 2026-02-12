@@ -1,1 +1,1 @@
-python generate_mesh_from_output.py --output_txt ~/Downloads/chatgarment_results/llava-finetuned/example_images_img_recon/vis_new/valid_garment_e918651cc154a7570e47d8b8f6c0f0f93cfbb7d5129103a1bacd8299ba945f91/output.txt --output_dir ~/test_mesh
+python generate_mesh_from_output.py --output_txt ~/Downloads/chatgarment_results/llava-finetuned/example_images_img_recon/vis_new/valid_garment_62bb809fc2dcd50409cb36163a0eb222f9aa1af0f256a3233b67b3ed4081dc71/output.txt --output_dir ~/test_mesh

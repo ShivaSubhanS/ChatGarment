@@ -44,7 +44,7 @@ with open(os.path.join(_CHATGARMENT_DIR, 'docs/all_float_paths.json'), 'r') as f
     all_float_paths = json.load(f)
 
 
-with open(os.path.join(_CHATGARMENT_DIR, 'assets/design_params/design_used.yaml'), 'r') as f:
+with open(os.path.join(_GARMENTCODE_DIR, 'assets/design_params/design_used.yaml'), 'r') as f:
     designs_config = yaml.safe_load(f)
     
 

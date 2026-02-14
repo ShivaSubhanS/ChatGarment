@@ -82,6 +82,9 @@ def recursive_change_params(cfg, pred_cfg, invnorm_float=False, parent_path='des
             v = float(v)
 
             if invnorm_float:
+                # Treat -1 as "use reasonable default" (mid-range = 0.5)
+                if v < 0:
+                    v = 0.5
                 v = np.clip(v, 0, 1)
                 # Inverse normalization for float values
                 lower_bd = float(cfg['range'][0])

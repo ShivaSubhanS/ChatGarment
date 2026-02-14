@@ -40,11 +40,11 @@ skirt_configs =  {
 }
 all_skirt_configs = ['skirt', 'flare-skirt', 'godet-skirt', 'pencil-skirt', 'levels-skirt', 'pants']
 
-with open('docs/all_float_paths.json', 'r') as f:
+with open(os.path.join(_CHATGARMENT_DIR, 'docs/all_float_paths.json'), 'r') as f:
     all_float_paths = json.load(f)
 
 
-with open('assets/design_params/design_used.yaml', 'r') as f:
+with open(os.path.join(_CHATGARMENT_DIR, 'assets/design_params/design_used.yaml'), 'r') as f:
     designs_config = yaml.safe_load(f)
     
 

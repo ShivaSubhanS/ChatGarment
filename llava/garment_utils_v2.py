@@ -17,7 +17,9 @@ import shutil
 import subprocess
 from collections import OrderedDict
 
-sys.path.insert(1, '/is/cluster/fast/sbian/github/GarmentCodeV2/')
+_CHATGARMENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_GARMENTCODE_DIR = os.path.join(os.path.dirname(_CHATGARMENT_DIR), 'GarmentCodeRC')
+sys.path.insert(1, _GARMENTCODE_DIR)
 
 # Custom
 from assets.garment_programs.meta_garment import MetaGarment
@@ -309,7 +311,7 @@ def run_simultion_warp(pattern_spec, sim_config, output_path, easy_texture_path=
         body_name='mean_all',    # 'f_smpl_average_A40'
         smpl_body=False,   # NOTE: depends on chosen body model
         add_timestamp=False,
-        system_path='/is/cluster/fast/sbian/github/GarmentCodeV2/system.json',
+        system_path=os.path.join(_GARMENTCODE_DIR, 'system.json'),
         easy_texture_path=easy_texture_path
     )
 

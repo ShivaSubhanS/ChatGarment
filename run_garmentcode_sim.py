@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 
 # add the path of GarmentCode
-sys.path.insert(1, '/is/cluster/fast/sbian/github/GarmentCodeV2/')
+CHATGARMENT_DIR = os.path.dirname(os.path.abspath(__file__))
+GARMENTCODE_DIR = os.path.join(os.path.dirname(CHATGARMENT_DIR), 'GarmentCodeRC')
+sys.path.insert(1, GARMENTCODE_DIR)
 from assets.garment_programs.meta_garment import MetaGarment
 from assets.bodies.body_params import BodyParameters
 
@@ -29,7 +31,7 @@ def run_simultion_warp(pattern_spec, sim_config, output_path, easy_texture_path)
         body_name='mean_all',    # 'f_smpl_average_A40'
         smpl_body=False,   # NOTE: depends on chosen body model
         add_timestamp=False,
-        system_path='/is/cluster/fast/sbian/github/GarmentCodeV2/system.json',
+        system_path=os.path.join(GARMENTCODE_DIR, 'system.json'),
         easy_texture_path=easy_texture_path
     )
 
@@ -71,6 +73,10 @@ if len(args.all_paths_json) > 1:
 
 elif args.json_spec_file:
     garment_json_paths = [args.json_spec_file]
+
+else:
+    print("Error: Please provide --all_paths_json or --json_spec_file argument")
+    sys.exit(1)
 
 print(len(garment_json_paths))
 for json_spec_file in garment_json_paths:

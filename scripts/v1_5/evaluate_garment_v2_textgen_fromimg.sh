@@ -1,13 +1,11 @@
 #!/bin/bash
 
-export LD_LIBRARY_PATH=/is/software/nvidia/cuda-12.1/lib64
-export PATH=$PATH:/is/software/nvidia/cuda-12.1/bin
-export CUDA_HOME=/is/software/nvidia/cuda-12.1
-
-export CPATH=/is/software/nvidia/cudnn-8.4.1-cu11.6/include
-export C_INCLUDE_PATH=/is/software/nvidia/cudnn-8.4.1-cu11.6/include
-export LIBRARY_PATH=/is/software/nvidia/cudnn-8.4.1-cu11.6/lib64
-export LD_LIBRARY_PATH=$LIBRARY_PATH:$LD_LIBRARY_PATH
+# Auto-detect CUDA paths (works on Kaggle and standard Linux installs)
+if [ -z "$CUDA_HOME" ]; then
+    export CUDA_HOME=$(dirname $(dirname $(which nvcc 2>/dev/null || echo "/usr/local/cuda/bin/nvcc")))
+fi
+export LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH:-}
+export PATH=${CUDA_HOME}/bin:$PATH
 
 export EGL_DEVICE_ID=$GPU_DEVICE_ORDINAL
 # export TCNN_CUDA_ARCHITECTURES=80

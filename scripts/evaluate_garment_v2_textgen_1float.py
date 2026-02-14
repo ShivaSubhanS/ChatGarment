@@ -336,7 +336,7 @@ def main(args):
     )
 
     ########################################################################################
-    resume_path = 'checkpoints/try_7b_lr1e_4_v3_garmentcontrol_4h100_v4_final/pytorch_model.bin'
+    resume_path = os.environ.get('CHATGARMENT_MODEL_PATH', 'checkpoints/try_7b_lr1e_4_v3_garmentcontrol_4h100_v4_final/pytorch_model.bin')
     state_dict = torch.load(resume_path, map_location="cpu")
     model.load_state_dict(state_dict, strict=True)
     model = model.bfloat16().cuda()

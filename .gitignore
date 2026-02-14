@@ -34,7 +34,6 @@ ckpts*
 serve_images/
 
 runs
-assets
 playground
 *.blend
 req_kag_def.txt

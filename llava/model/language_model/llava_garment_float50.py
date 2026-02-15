@@ -199,7 +199,9 @@ class GarmentGPTFloat50ForCausalLM(LlavaLlamaForCausalLM):
             output_hidden_states = torch.cat(output_hidden_states, dim=1)
             output_ids = outputs.sequences
 
-            seg_token_mask = output_ids[:, 2:] == self.seg_token_idx
+            # Align mask with hidden states: generated tokens start after input tokens
+            input_length = output_ids.shape[1] - output_hidden_states.shape[1]
+            seg_token_mask = output_ids[:, input_length:] == self.seg_token_idx
 
             if seg_token_mask.sum() > 0:
                 last_hidden_state = self.float_layer(output_hidden_states).reshape(1, -1, self.last_dim)

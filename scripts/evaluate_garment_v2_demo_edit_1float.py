@@ -210,7 +210,7 @@ def ask_gpt4o(garment_name, garment_prompt, image_path, client):
 
     
 def main(args):
-    attn_implementation = 'flash_attention_2'
+    attn_implementation = 'eager'  # P100/T4 don't support flash_attention_2 (requires Ampere)
     global local_rank
 
     parser = transformers.HfArgumentParser(

@@ -20,6 +20,12 @@ def run_simultion_warp(pattern_spec, sim_config, output_path, easy_texture_path)
     props = data_config.Properties(sim_config) 
     props.set_section_stats('sim', fails={}, sim_time={}, spf={}, fin_frame={}, body_collisions={}, self_collisions={})
     props.set_section_stats('render', render_time={})
+    
+    # Fix fabric texture path if it's relative - resolve to GarmentCodeRC directory
+    fabric_path = props['render']['config']['uv_texture'].get('fabric_grain_texture_path')
+    if fabric_path and fabric_path.startswith('./'):
+        absolute_fabric_path = os.path.join(GARMENTCODE_DIR, fabric_path[2:])  # Remove './' prefix
+        props['render']['config']['uv_texture']['fabric_grain_texture_path'] = absolute_fabric_path
 
     spec_path = Path(pattern_spec)
     garment_name, _, _ = spec_path.stem.rpartition('_')  # assuming ending in '_specification'
@@ -83,9 +89,10 @@ for json_spec_file in garment_json_paths:
     print(json_spec_file)
     json_spec_file = json_spec_file.replace('validate_garment', 'valid_garment')
     saved_folder = os.path.dirname(json_spec_file)
+    sim_config = os.path.join(GARMENTCODE_DIR, 'assets/Sim_props/default_sim_props.yaml')
     run_simultion_warp(
             json_spec_file,
-            'assets/Sim_props/default_sim_props.yaml',
+            sim_config,
             saved_folder,
             easy_texture_path=args.easy_texture_path
         )

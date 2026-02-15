@@ -36,5 +36,6 @@ serve_images/
 runs
 assets
 playground
-*.blend
+*.blend*
+/garment_patterns/
 req_kag_def.txt

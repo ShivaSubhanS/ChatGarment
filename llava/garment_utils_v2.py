@@ -353,10 +353,17 @@ def run_garmentcode_sim(json_paths_json):
 
 
 def run_garmentcode_parser_float50(all_json_spec_files, json_output, float_preds, output_dir):
-    # Handle case where json_output is a list (e.g., [{...}]) instead of a dict
+    # Handle case where json_output is a list (e.g., [{...}] or [{upper}, {lower}]) instead of a dict
     if isinstance(json_output, list):
         if len(json_output) == 1 and isinstance(json_output[0], dict):
             json_output = json_output[0]
+        elif len(json_output) == 2 and all(isinstance(item, dict) for item in json_output):
+            # Likely two separate garments: reconstruct expected format
+            print(f"Info: Reconstructed json_output from list of 2 garments")
+            json_output = {
+                'upperbody_garment': json_output[0],
+                'lowerbody_garment': json_output[1]
+            }
         else:
             print(f"Warning: Unexpected json_output format (list with {len(json_output)} items). Skipping.")
             return all_json_spec_files
@@ -406,10 +413,17 @@ def run_garmentcode_parser_float50(all_json_spec_files, json_output, float_preds
 
 
 def run_garmentcode_parser(all_json_spec_files, json_output, output_dir):
-    # Handle case where json_output is a list (e.g., [{...}]) instead of a dict
+    # Handle case where json_output is a list (e.g., [{...}] or [{upper}, {lower}]) instead of a dict
     if isinstance(json_output, list):
         if len(json_output) == 1 and isinstance(json_output[0], dict):
             json_output = json_output[0]
+        elif len(json_output) == 2 and all(isinstance(item, dict) for item in json_output):
+            # Likely two separate garments: reconstruct expected format
+            print(f"Info: Reconstructed json_output from list of 2 garments")
+            json_output = {
+                'upperbody_garment': json_output[0],
+                'lowerbody_garment': json_output[1]
+            }
         else:
             print(f"Warning: Unexpected json_output format (list with {len(json_output)} items). Skipping.")
             return all_json_spec_files

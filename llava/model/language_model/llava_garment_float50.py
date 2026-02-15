@@ -80,6 +80,7 @@ class GarmentGPTFloat50ForCausalLM(LlavaLlamaForCausalLM):
         float_labels: Optional[torch.FloatTensor] = None,
         float_weight: Optional[torch.FloatTensor] = None,
         inference: Optional[bool] = False,
+        cache_position: Optional[torch.LongTensor] = None,
         # input_ids_backup: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
@@ -98,7 +99,8 @@ class GarmentGPTFloat50ForCausalLM(LlavaLlamaForCausalLM):
             output_hidden_states=True,
             images=images,
             image_sizes=image_sizes,
-            return_dict=return_dict
+            return_dict=return_dict,
+            cache_position=cache_position
         )
 
         output_hidden_states = output.hidden_states

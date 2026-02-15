@@ -52,6 +52,9 @@ def run_simultion_warp(pattern_spec, sim_config, output_path, easy_texture_path)
 
     props.serialize(paths.element_sim_props)
 
+    # Auto-detect headless environment (Kaggle or no DISPLAY)
+    skip_render = os.environ.get('KAGGLE_HEADLESS') or not os.environ.get('DISPLAY')
+    
     run_sim(
         garment_box_mesh.name, 
         props, 
@@ -59,7 +62,8 @@ def run_simultion_warp(pattern_spec, sim_config, output_path, easy_texture_path)
         save_v_norms=False,
         store_usd=False,  # NOTE: False for fast simulation!
         optimize_storage=False,   # props['sim']['config']['optimize_storage'],
-        verbose=False
+        verbose=False,
+        skip_render=skip_render  # Auto-detect headless environment
     )
     
     props.serialize(paths.element_sim_props)

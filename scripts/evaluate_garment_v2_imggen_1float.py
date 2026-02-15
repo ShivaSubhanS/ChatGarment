@@ -397,6 +397,14 @@ def main(args):
     saved_json_Path = os.path.join(parent_folder, 'vis_new', 'all_json_spec_files.json')
     with open(saved_json_Path, 'w') as f:
         json.dump(all_json_spec_files, f)
+    
+    print('\n' + '='*60)
+    print('✓ RECONSTRUCTION COMPLETED SUCCESSFULLY!')
+    print('='*60)
+    print(f'Processed {len(val_dataset)} images')
+    print(f'Output directory: {parent_folder}')
+    print(f'Generated {len(all_json_spec_files)} pattern specifications')
+    print('='*60)
 
         
 if __name__ == "__main__":

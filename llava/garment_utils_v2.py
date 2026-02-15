@@ -191,12 +191,12 @@ def try_generate_garments(body_measurement_path, garment_output, garment_name, o
     global designs_config
     bodies_measurements = {
         # Our model
-        'neutral': './assets/bodies/mean_all.yaml',
-        'mean_female': './assets/bodies/mean_female.yaml',
-        'mean_male': './assets/bodies/mean_male.yaml',
+        'neutral': os.path.join(_GARMENTCODE_DIR, 'assets/bodies/mean_all.yaml'),
+        'mean_female': os.path.join(_GARMENTCODE_DIR, 'assets/bodies/mean_female.yaml'),
+        'mean_male': os.path.join(_GARMENTCODE_DIR, 'assets/bodies/mean_male.yaml'),
         # SMPL
-        'f_smpl': './assets/bodies/f_smpl_average_A40.yaml',
-        'm_smpl': './assets/bodies/m_smpl_average_A40.yaml'
+        'f_smpl': os.path.join(_GARMENTCODE_DIR, 'assets/bodies/f_smpl_average_A40.yaml'),
+        'm_smpl': os.path.join(_GARMENTCODE_DIR, 'assets/bodies/m_smpl_average_A40.yaml')
     }
 
     design_pred_raw = garment_output
